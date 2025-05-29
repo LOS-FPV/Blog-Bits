@@ -1,18 +1,20 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 
-// 🔧 Must be declared at the top-level before any functions use it
+// ✅ Declare and assign `allPosts` at the top level
 const allPosts = import.meta.glob('../../content/posts/*.mdx');
 
 export async function getStaticPaths() {
-  return Object.keys(allPosts).map((path) => {
-    const slug = path.split('/').pop().replace('.mdx', '');
+  return Object.keys(allPosts).map((file) => {
+    const slug = file.split('/').pop().replace('.mdx', '');
     return { params: { slug } };
   });
 }
 
 const slug = Astro.params.slug;
 const postPath = `../../content/posts/${slug}.mdx`;
+
+// ✅ This loads the MDX module and extracts frontmatter + content
 const post = await allPosts[postPath]();
 const { frontmatter, default: Content } = post;
 ---
