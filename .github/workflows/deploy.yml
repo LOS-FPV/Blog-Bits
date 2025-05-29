@@ -2,8 +2,8 @@ name: Generate Blog Post Twice Daily
 
 on:
   schedule:
-    - cron: '0 1 * * *'
-    - cron: '0 13 * * *'
+    - cron: '0 1 * * *'    # 01:00 UTC
+    - cron: '0 13 * * *'   # 13:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -33,9 +33,20 @@ jobs:
         run: |
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Action"
+
+          # 🔐 Mask the token so it’s not scanned or printed in logs
+          echo "::add-mask::${GH_TOKEN}"
+
+          # 🧹 Clear GitHub’s cached bot credentials
           git credential reject <<<"protocol=https
 host=github.com"
+
+          # ✅ Use the token for authenticated push
           git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}
+
+          # 📦 Commit only if changes exist
           git add .
           git diff-index --quiet HEAD || git commit -m "Auto post: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+
+          # 🚀 Push to main
           git push origin main
