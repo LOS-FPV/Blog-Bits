@@ -1,9 +1,8 @@
-name: Generate Blog Post Twice Daily
+name: Generate & Deploy Blog Post
 
 on:
   schedule:
-    - cron: '0 1 * * *'    # 01:00 UTC
-    - cron: '0 13 * * *'   # 13:00 UTC
+    - cron: '0 1,13 * * *'  # 01:00 and 13:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -11,34 +10,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repo
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Setup Node
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install Dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Generate Blog Post
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npm run generate-post
+      - name: Create SSH directory
+        run: mkdir -p ~/.ssh && chmod 700 ~/.ssh
 
-      - name: Set up SSH
+      - name: Add SSH key
         run: |
-          mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Commit and Push Changes via SSH
+      - name: Add GitHub to known_hosts
+        run: ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Configure Git identity
         run: |
           git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Action"
-          git remote set-url origin git@github.com:${{ github.repository }}
-          git add .
-          git diff-index --quiet HEAD || git commit -m "Auto post: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          git push origin main
+          git config --global user.name "GitHub Actions Bot"
+
+      - name: Generate new blog post
+        run: npm run generate-post
+
+      - name: Commit changes
+        run: |
+          git add content/posts
+          git commit -m "Auto post: $(date -u)" || echo "No changes to commit"
+
+      - name: Push to GitHub
+        run: git push git@github.com:LOS-FPV/Blog-Bits.git HEAD:main
+
+      - name: Trigger Vercel redeploy
+        if: success()
+        run: |
+          curl -X POST ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
