@@ -1,0 +1,35 @@
+name: Generate Blog Post Twice Daily
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 01:00 UTC
+    - cron: '0 13 * * *'  # 13:00 UTC
+  workflow_dispatch:
+
+jobs:
+  generate-post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Blog Post
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm run generate-post
+
+      - name: Commit and Push
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Action"
+          git add .
+          git commit -m "Auto post: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" || echo "Nothing to commit"
+          git push
