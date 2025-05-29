@@ -1,7 +1,6 @@
 
 ---
 import Layout from '../../layouts/Layout.astro';
-import { Markdown } from 'astro/components';
 export async function getStaticPaths() {
   const glob = import.meta.glob('../../content/posts/*.mdx');
   return Object.keys(glob).map((file) => {
