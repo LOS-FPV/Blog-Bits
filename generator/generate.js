@@ -1,5 +1,3 @@
-// generator/generate.js
-
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
@@ -10,7 +8,6 @@ dotenv.config();
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const BLOG_DIR = './content/posts';
-
 const KEYWORDS = [
   'best electric scooters 2025',
   'lightweight e-moto for city commute',
@@ -31,7 +28,7 @@ async function generateArticle(keyword) {
     },
     {
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
     }
