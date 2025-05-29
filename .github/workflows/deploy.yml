@@ -2,7 +2,7 @@ name: Generate & Deploy Blog Post
 
 on:
   schedule:
-    - cron: '0 1,13 * * *'  # 01:00 and 13:00 UTC
+    - cron: '0 1,13 * * *' # Run at 01:00 and 13:00 UTC daily
   workflow_dispatch:
 
 jobs:
@@ -18,37 +18,24 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install core dependencies
+        run: npm ci || npm install
 
-      - name: Create SSH directory
-        run: mkdir -p ~/.ssh && chmod 700 ~/.ssh
+      - name: Ensure axios is installed
+        run: npm install axios
 
-      - name: Add SSH key
-        run: |
-          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-      - name: Add GitHub to known_hosts
-        run: ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-      - name: Configure Git identity
-        run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions Bot"
-
-      - name: Generate new blog post
+      - name: Generate blog post
         run: npm run generate-post
 
-      - name: Commit changes
+      - name: Commit and push new post
         run: |
-          git add content/posts
-          git commit -m "Auto post: $(date -u)" || echo "No changes to commit"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add content/posts/*.mdx || echo "No new posts to commit"
+          git diff --cached --quiet || git commit -m "Auto post: $(date -u)"
+          git push origin main
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Push to GitHub
-        run: git push git@github.com:LOS-FPV/Blog-Bits.git HEAD:main
-
-      - name: Trigger Vercel redeploy
-        if: success()
-        run: |
-          curl -X POST ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+      - name: Trigger Vercel deploy
+        run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
