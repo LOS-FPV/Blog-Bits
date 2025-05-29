@@ -1,6 +1,7 @@
 {
   "name": "ai-scooter-blog",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -8,11 +9,11 @@
     "generate-post": "node generator/generate.js"
   },
   "dependencies": {
+    "astro": "^4.0.0",
     "@astrojs/mdx": "^2.0.0",
     "@astrojs/tailwind": "^3.0.0",
-    "astro": "^4.0.0",
     "axios": "^1.4.0",
     "date-fns": "^3.2.0",
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.3.1"
   }
 }
