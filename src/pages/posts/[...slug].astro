@@ -1,22 +1,22 @@
 ---
+// src/pages/posts/[...slug].astro
+import { getCollection, render } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 
-// ✅ Declare and assign `allPosts` at the top level
-const allPosts = import.meta.glob('../../content/posts/*.mdx');
-
 export async function getStaticPaths() {
-  return Object.keys(allPosts).map((file) => {
-    const slug = file.split('/').pop().replace('.mdx', '');
-    return { params: { slug } };
+  const allPosts = await getCollection('posts');
+  return allPosts.map((post) => {
+    const slugSegments = post.id.split('/');
+    return {
+      params: { slug: slugSegments },
+      props: { post },
+    };
   });
 }
 
-const slug = Astro.params.slug;
-const postPath = `../../content/posts/${slug}.mdx`;
-
-// ✅ This loads the MDX module and extracts frontmatter + content
-const post = await allPosts[postPath]();
-const { frontmatter, default: Content } = post;
+const { post } = Astro.props;
+const { Content } = await render(post);
+const frontmatter = post.data;
 ---
 
 <Layout title={frontmatter.title}>

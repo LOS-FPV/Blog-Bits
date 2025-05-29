@@ -1,64 +1,70 @@
+import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import matter from 'gray-matter';
+import { OpenAI } from 'openai';
 import axios from 'axios';
-import dotenv from 'dotenv';
+import { execSync } from 'child_process';
 import { format } from 'date-fns';
 
-dotenv.config();
+// Setup paths
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const contentDir = path.join(__dirname, '../content/posts');
+const imageDir = path.join(__dirname, '../public/images');
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const BLOG_DIR = './content/posts';
-const KEYWORDS = [
-  'best electric scooters 2025',
-  'lightweight e-moto for city commute',
-  'e-scooter maintenance tips',
-  'top e-motos under $3000',
-  'eco benefits of electric mobility'
-];
+// Ensure folders exist
+fs.mkdirSync(contentDir, { recursive: true });
+fs.mkdirSync(imageDir, { recursive: true });
 
-async function generateArticle(keyword) {
-  const prompt = `Write a detailed blog post (500+ words) on "${keyword}". Include comparisons, pros/cons, and end with a strong call to action to check out top e-scooters and e-motos. Include Amazon affiliate links in Markdown format.`;
+// Setup OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-  const response = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
+// Generate blog topic
+const topic = 'Best E-Scooter Accessories for 2025';
+const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+const formattedDate = format(new Date(), 'yyyy-MM-dd');
 
-  return response.data.choices[0].message.content;
-}
+// Generate content
+const completion = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [
+    { role: 'system', content: 'Write a markdown blog post with a heading and paragraphs about the topic.' },
+    { role: 'user', content: topic },
+  ],
+});
+const article = completion.choices[0].message.content;
 
-function saveArticle(content, keyword) {
-  const slug = keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const date = format(new Date(), 'yyyy-MM-dd');
-  const filename = `${date}-${slug}.mdx`;
-  const filepath = path.join(BLOG_DIR, filename);
+// Generate image
+const imageResponse = await openai.images.generate({
+  model: 'dall-e-3',
+  prompt: `A realistic photo of modern e-scooter accessories in 2025: helmets, wheels, batteries, controllers`,
+  n: 1,
+  size: '1024x1024',
+  response_format: 'url',
+});
+const imageUrl = imageResponse.data[0].url;
 
-  const frontMatter = `---\ntitle: "${keyword}"\ndate: "${date}"\ntags: [e-scooter, e-moto]\ndescription: Auto-generated blog on "${keyword}"\n---\n\n`;
+// Save image
+const imagePath = path.join(imageDir, `${slug}.jpg`);
+const imageDownload = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+fs.writeFileSync(imagePath, imageDownload.data);
 
-  const footer = `\n\n---\n\n**Top Products:**\n\n- [Best Electric Scooter on Amazon](https://www.amazon.com/dp/B07Z5XHX6F?tag=yourtag-20)\n- [Affordable E-Moto on Amazon](https://www.amazon.com/dp/B08N5WRWNW?tag=yourtag-20)`;
+// Save content
+const filePath = path.join(contentDir, `${slug}.mdx`);
+const frontmatter = matter.stringify(article, {
+  title: topic,
+  date: formattedDate,
+  image: `/images/${slug}.jpg`,
+});
+fs.writeFileSync(filePath, frontmatter);
 
-  fs.writeFileSync(filepath, frontMatter + content + footer);
-  console.log(`✅ Blog post saved to ${filepath}`);
-}
+// Git commit & push
+execSync('git add .', { stdio: 'inherit' });
+execSync(`git commit -m "Add post: ${topic}"`, { stdio: 'inherit' });
+execSync('git push origin main', { stdio: 'inherit' });
 
-async function main() {
-  const keyword = KEYWORDS[Math.floor(Math.random() * KEYWORDS.length)];
-  try {
-    const content = await generateArticle(keyword);
-    saveArticle(content, keyword);
-  } catch (error) {
-    console.error('❌ Error generating article:', error.response?.data || error.message);
-  }
-}
-
-main();
+console.log(`✅ Post generated and pushed: ${slug}`);
