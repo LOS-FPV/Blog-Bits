@@ -1,54 +1,45 @@
-name: Deploy New Posts to Astro Blog
+name: Generate and Publish Blog Post
 
 on:
-  push:
-    branches: [ main ]
   schedule:
-    - cron: '0 6 * * *'  # Every day at 06:00 UTC
+    - cron: '0 6 * * *' # daily at 6:00am UTC
+  workflow_dispatch:     # manual trigger
+  push:
+    paths:
+      - generator/**
+      - .github/workflows/deploy.yml
 
 jobs:
   generate-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # allow pushing commits to the repo
+
     env:
-      # Use repository secrets for tokens/URLs (injected as env vars)
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          ref: main   # ensure we're on the main branch (especially for schedule)
-          token: ${{ secrets.GH_TOKEN }}
 
-      - name: Setup Node.js 18.x
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: 18
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Generate New Post
+      - name: Generate blog post
         run: npm run generate-post
 
-      - name: Commit and Push changes
+      - name: Commit and push new post (if any)
         run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "[email protected]"
-          git add -A
-          # Commit and push only if there are changes (new posts)
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No new posts to commit."
-          else
-            git commit -m "chore: add new generated posts [skip ci]"
-            git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:main
-            echo "NEW_POSTS=true" >> $GITHUB_ENV
-          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "actions@github.com"
+          git add content/posts/*.mdx || true
+          git diff --cached --quiet || git commit -m "Auto post: $(date -u +'%Y-%m-%d %H:%M:%S') UTC"
+          git push
 
-      - name: Trigger Vercel Deployment
-        if: env.NEW_POSTS == 'true'
+      - name: Trigger Vercel Deploy Hook
+        if: success()
         run: |
-          # Invoke Vercel deploy hook to trigger a new deployment
-          curl -X POST -fsS "$VERCEL_DEPLOY_HOOK_URL"
+          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
